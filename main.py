@@ -139,10 +139,10 @@ def download_with_ytdlp(url: str, cookies: str | None, temp_dir: Path) -> tuple[
     if format_result.stderr:
         logger.debug(f"[download_with_ytdlp] Format stderr:\n{format_result.stderr}")
 
-    # 비디오 다운로드
+    # 비디오 다운로드 (최고 품질 비디오+오디오 병합)
     logger.info("[download_with_ytdlp] Starting video download...")
     video_cmd = base_cmd + [
-        "-f", "best[height<=720][ext=mp4]/best[height<=720]/best",
+        "-f", "bestvideo[height<=720]+bestaudio/best[height<=720]",
         "--merge-output-format", "mp4",
         "-o", str(video_path),
         url,
@@ -184,24 +184,24 @@ def download_with_ytdlp(url: str, cookies: str | None, temp_dir: Path) -> tuple[
 
     logger.info(f"[download_with_ytdlp] Video file confirmed: {video_path} ({video_path.stat().st_size} bytes)")
 
-    # 오디오 다운로드
-    logger.info("[download_with_ytdlp] Starting audio download...")
-    audio_cmd = base_cmd + [
-        "-x", "--audio-format", "m4a",
-        "-o", str(audio_path),
-        url,
+    # ffmpeg로 비디오에서 오디오 추출 (비디오 파일 유지)
+    logger.info("[download_with_ytdlp] Extracting audio from video with ffmpeg...")
+    audio_cmd = [
+        "ffmpeg", "-y", "-i", str(video_path),
+        "-vn", "-acodec", "aac", "-b:a", "128k",
+        str(audio_path),
     ]
     logger.debug(f"[download_with_ytdlp] Audio command: {' '.join(audio_cmd)}")
 
     result = subprocess.run(audio_cmd, capture_output=True, text=True)
-    logger.debug(f"[download_with_ytdlp] Audio download returncode: {result.returncode}")
-    logger.debug(f"[download_with_ytdlp] Audio download stdout:\n{result.stdout}")
+    logger.debug(f"[download_with_ytdlp] Audio extraction returncode: {result.returncode}")
+    logger.debug(f"[download_with_ytdlp] Audio extraction stdout:\n{result.stdout}")
     if result.stderr:
-        logger.debug(f"[download_with_ytdlp] Audio download stderr:\n{result.stderr}")
+        logger.debug(f"[download_with_ytdlp] Audio extraction stderr:\n{result.stderr}")
 
     if result.returncode != 0:
-        logger.error(f"[download_with_ytdlp] Audio download failed with code {result.returncode}")
-        raise RuntimeError(f"Audio download failed: {result.stderr}")
+        logger.error(f"[download_with_ytdlp] Audio extraction failed with code {result.returncode}")
+        raise RuntimeError(f"Audio extraction failed: {result.stderr}")
 
     # temp_dir 내용 다시 확인
     logger.info("[download_with_ytdlp] Checking temp_dir contents after audio download...")
